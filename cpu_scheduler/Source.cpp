@@ -1,8 +1,19 @@
+/*
+COP4610 - Fall 2024
+Programming Assignment: CPU Scheduler
+
+Made by: Jordan Small (Z23465928)
+
+20 OCT 2024
+*/
+
 #include <iostream>
 #include <vector>
 #include <algorithm>
 #include <iomanip>
 #include <list>
+#include <string>
+#include <fstream>
 
 using namespace std;
 
@@ -56,49 +67,47 @@ public:
 };
 
 // Scheduling Algorithms
-vector<Process> FCFS(vector<Process> processes);
-vector<Process> SJF(vector<Process> processes);
-vector<Process> MLFQ(vector<Process> processes);
+vector<Process> FCFS(vector<Process> processes, ostream& out);
+vector<Process> SJF(vector<Process> processes, ostream& out);
+vector<Process> MLFQ(vector<Process> processes, ostream& out);
 
 // Helper Functions
 void sort_process_by_id(vector<Process>& processes);
-void print_results(vector<Process> processes);
-void print_averages(vector<Process> processes);
+void print_results(vector<Process> processes, ostream& out);
+void print_averages(vector<Process> processes, ostream& out);
 void sort_process_by_next_cpu_burst(list<Process>& ready_list);
 void sort_process_by_queue_level(list<Process>& ready_list);
 void calculate_wait_time(vector<Process>& processes);
 int get_preemption_time(int level_counter);
 
+// Functions for main driver
+vector<Process> load_processes();
+void welcome();
+char mainMenu();
+void makeSelection(char choice, vector<Process> processes);
+char output();
+void goodbye();
+
 int main() {
 
-    vector<Process> processes = {
-        Process(1, {5, 27, 3, 31, 5, 43, 4, 18, 6, 22, 4, 26, 3, 24, 4}),
-        Process(2, {4, 48, 5, 44, 7, 42, 12, 37, 9, 76, 4, 41, 9, 31, 7, 43, 8}),
-        Process(3, {8, 33, 12, 41, 18, 65, 14, 21, 4, 61, 15, 18, 14, 26, 5, 31, 6}),
-        Process(4, {3, 35, 4, 41, 5, 45, 3, 51, 4, 61, 5, 54, 6, 82, 5, 77, 3}),
-        Process(5, {16, 24, 17, 21, 5, 36, 16, 26, 7, 31, 13, 28, 11, 21, 6, 13, 3, 11, 4}),
-        Process(6, {11, 22, 4, 8, 5, 10, 6, 12, 7, 14, 9, 18, 12, 24, 15, 30, 8}),
-        Process(7, {14, 46, 17, 41, 11, 42, 15, 21, 4, 32, 7, 19, 16, 33, 10}),
-        Process(8, {4, 14, 5, 33, 6, 51, 14, 73, 16, 87, 6})
-    };
+    vector <Process> processes = load_processes();
+    welcome();
 
-    vector <Process> complete_fcfs = FCFS(processes);
-    print_results(complete_fcfs);
-    print_averages(complete_fcfs);
+    char menu_choice = mainMenu();
 
-    //vector <Process> complete_sjf = SJF(processes);
-    //print_results(complete_sjf);
-    //print_averages(complete_sjf);
+    while (menu_choice != 'Q') {
 
-    //vector <Process> complete_mlfq = MLFQ(processes);
-    //print_results(complete_mlfq);
-    //print_averages(complete_mlfq);
+        makeSelection(menu_choice, processes);
+        menu_choice = mainMenu();
 
+    }
+
+    goodbye();
     return 0;
 
 }
 
-vector<Process> FCFS(vector<Process> processes) {
+vector<Process> FCFS(vector<Process> processes, ostream& out) {
 
     list<Process> ready_list;
     list<Process> io_list;
@@ -116,7 +125,7 @@ vector<Process> FCFS(vector<Process> processes) {
 
     while (completed_list.size() < processes.size()) {
 
-        cout << "Time: " << time << endl;
+        out << "Time: " << time << endl;
 
         // Check for a running process
         if (!current_process && !ready_list.empty()) {
@@ -134,7 +143,7 @@ vector<Process> FCFS(vector<Process> processes) {
             current_process->get_bursts()[current_process->get_burst_index()] -= 1;
             cpuUtil++;
 
-            cout << "Ran: [Process " << current_process->get_id() << ", CPU Burst remaining: " << current_process->get_bursts()[current_process->get_burst_index()] << "]" << endl;
+            out << "Ran: [Process " << current_process->get_id() << ", CPU Burst remaining: " << current_process->get_bursts()[current_process->get_burst_index()] << "]" << endl;
 
             // Check if the CPU burst is finished
             if (current_process->get_bursts()[current_process->get_burst_index()] == 0) {
@@ -151,7 +160,7 @@ vector<Process> FCFS(vector<Process> processes) {
                     current_process->set_state(4); // Set to completed
                     current_process->set_turnaroundTime(time + 1);
                     completed_list.push_back(*current_process);
-                    cout << "***Process " << current_process->get_id() << " completed at time " << time + 1 << "***" << endl;
+                    out << "***Process " << current_process->get_id() << " completed at time " << time + 1 << "***" << endl;
                 }
 
                 ready_list.pop_front(); // Remove from ready list
@@ -161,7 +170,7 @@ vector<Process> FCFS(vector<Process> processes) {
         }
 
         else {
-            cout << "[No process running]" << endl;
+            out << "[No process running]" << endl;
         }
 
         // Handle I/O processes
@@ -185,42 +194,43 @@ vector<Process> FCFS(vector<Process> processes) {
         }
 
         // Print Ready List
-        cout << "Ready List: [";
+        out << "Ready List: [";
         for (auto it = ready_list.begin(); it != ready_list.end(); it++) {
             if (it != ready_list.begin()) {
-                cout << "{Process " << it->get_id() << ", ";
-                cout << "Upcoming CPU Burst: " << it->get_bursts()[it->get_burst_index()] << "}";
+                out << "{Process " << it->get_id() << ", ";
+                out << "Upcoming CPU Burst: " << it->get_bursts()[it->get_burst_index()] << "}";
                 if (next(it) != ready_list.end()) {
-                    cout << ", ";
+                    out << ", ";
                 }
             }
         }
-        cout << "]" << endl;
+        out << "]" << endl;
 
         // Print I/O List
-        cout << "I/O List: [";
+        out << "I/O List: [";
         for (auto it = io_list.begin(); it != io_list.end(); it++) {
-            cout << "{Process " << it->get_id() << ", ";
-            cout << "I/O Burst remaining: " << it->get_bursts()[it->get_burst_index()] << "}";
+            out << "{Process " << it->get_id() << ", ";
+            out << "I/O Burst remaining: " << it->get_bursts()[it->get_burst_index()] << "}";
             if (next(it) != io_list.end()) {
-                cout << ", ";
+                out << ", ";
             }
         }
-        cout << "]" << endl;
+        out << "]" << endl;
 
         time++; // Increment time
 
     }
 
     calculate_wait_time(completed_list);
-    cout << endl << "Total run time: " << time << " units" << endl;
+    out << endl << "------------------------------------";
+    out << endl << "Total run time: " << time << " units" << endl;
     double cpuUtilPercent = (double)cpuUtil / time * 100;
-    cout << "CPU Utilization: " << cpuUtilPercent << "%" << endl << endl;
+    out << "CPU Utilization: " << cpuUtilPercent << "%" << endl << endl;
     return completed_list;
 
 }
 
-vector<Process> SJF(vector<Process> processes) {
+vector<Process> SJF(vector<Process> processes, ostream& out) {
 
     list<Process> ready_list;
     list<Process> io_list;
@@ -238,7 +248,7 @@ vector<Process> SJF(vector<Process> processes) {
 
     while (completed_list.size() < processes.size()) {
 
-        cout << "Time: " << time << endl;
+        out << "Time: " << time << endl;
 
         // Check for a running process
         if (!current_process && !ready_list.empty()) {
@@ -258,7 +268,7 @@ vector<Process> SJF(vector<Process> processes) {
             current_process->get_bursts()[current_process->get_burst_index()] -= 1;
             cpuUtil++;
 
-            cout << "Ran: [Process " << current_process->get_id() << ", CPU Burst remaining: " << current_process->get_bursts()[current_process->get_burst_index()] << "]" << endl;
+            out << "Ran: [Process " << current_process->get_id() << ", CPU Burst remaining: " << current_process->get_bursts()[current_process->get_burst_index()] << "]" << endl;
 
             // Check if the CPU burst is finished
             if (current_process->get_bursts()[current_process->get_burst_index()] == 0) {
@@ -274,7 +284,7 @@ vector<Process> SJF(vector<Process> processes) {
                     current_process->set_state(4); // Set to completed
                     current_process->set_turnaroundTime(time + 1);
                     completed_list.push_back(*current_process);
-                    cout << "***Process " << current_process->get_id() << " completed at time " << time + 1 << "***" << endl;
+                    out << "***Process " << current_process->get_id() << " completed at time " << time + 1 << "***" << endl;
                 }
 
                 ready_list.pop_front(); // Remove from ready list
@@ -283,7 +293,7 @@ vector<Process> SJF(vector<Process> processes) {
             }
         }
         else {
-            cout << "[No process running]" << endl;
+            out << "[No process running]" << endl;
         }
 
         // Handle I/O processes
@@ -308,41 +318,42 @@ vector<Process> SJF(vector<Process> processes) {
         }
 
         // Print Ready List
-        cout << "Ready List: [";
+        out << "Ready List: [";
         for (auto it = ready_list.begin(); it != ready_list.end(); it++) {
             if (it != ready_list.begin()) {
-                cout << "{Process " << it->get_id() << ", ";
-                cout << "Upcoming CPU Burst: " << it->get_bursts()[it->get_burst_index()] << "}";
+                out << "{Process " << it->get_id() << ", ";
+                out << "Upcoming CPU Burst: " << it->get_bursts()[it->get_burst_index()] << "}";
                 if (next(it) != ready_list.end()) {
-                    cout << ", ";
+                    out << ", ";
                 }
             }
         }
-        cout << "]" << endl;
+        out << "]" << endl;
 
         // Print I/O List
-        cout << "I/O List: [";
+        out << "I/O List: [";
         for (auto it = io_list.begin(); it != io_list.end(); it++) {
-            cout << "{Process " << it->get_id() << ", ";
-            cout << "I/O Burst remaining: " << it->get_bursts()[it->get_burst_index()] << "}";
+            out << "{Process " << it->get_id() << ", ";
+            out << "I/O Burst remaining: " << it->get_bursts()[it->get_burst_index()] << "}";
             if (next(it) != io_list.end()) {
-                cout << ", ";
+                out << ", ";
             }
         }
-        cout << "]" << endl;
+        out << "]" << endl;
 
         time++; // Increment time
     }
 
     calculate_wait_time(completed_list);
-    cout << endl << "Total run time: " << time << " units" << endl;
+    out << endl << "------------------------------------";
+    out << endl << "Total run time: " << time << " units" << endl;
     double cpuUtilPercent = (double)cpuUtil / time * 100;
-    cout << "CPU Utilization: " << cpuUtilPercent << "%" << endl << endl;
+    out << "CPU Utilization: " << cpuUtilPercent << "%" << endl << endl;
     return completed_list;
 
 }
 
-vector<Process> MLFQ(vector<Process> processes) {
+vector<Process> MLFQ(vector<Process> processes, ostream& out) {
 
     list<Process> ready_list; // Combined ready queue
     list<Process> io_list;    // I/O Queue
@@ -360,7 +371,7 @@ vector<Process> MLFQ(vector<Process> processes) {
 
     while (completed_list.size() < processes.size()) {
 
-        cout << "Time: " << time << endl;
+        out << "Time: " << time << endl;
 
         // Check for a running process
         if (!current_process && !ready_list.empty()) {
@@ -383,13 +394,13 @@ vector<Process> MLFQ(vector<Process> processes) {
             cpuUtil++;
             remaining_tq--;
 
-            cout << "Ran: [Process " << current_process->get_id() << ", CPU Burst remaining: " << current_process->get_bursts()[current_process->get_burst_index()] << "]" << endl;
+            out << "Ran: [Process " << current_process->get_id() << ", CPU Burst remaining: " << current_process->get_bursts()[current_process->get_burst_index()] << "]" << endl;
 
             if (remaining_tq < 11) {
-                cout << "Remaining tq: " << remaining_tq << endl;
+                out << "Remaining tq: " << remaining_tq << endl;
             }
             else {
-                cout << "Remaining tq: Burst is in Queue 3 and will run until finished" << endl;
+                out << "Remaining tq: Burst is in Queue 3 and will run until finished" << endl;
             }
 
             // If the process did not finish and the quantum has expired
@@ -418,7 +429,7 @@ vector<Process> MLFQ(vector<Process> processes) {
                         current_process->set_state(4);
                         current_process->set_turnaroundTime(time + 1);
                         completed_list.push_back(*current_process);
-                        cout << "***Process " << current_process->get_id() << " completed at time " << time + 1 << "***" << endl;
+                        out << "***Process " << current_process->get_id() << " completed at time " << time + 1 << "***" << endl;
                     }
                 }
                 else {
@@ -426,7 +437,7 @@ vector<Process> MLFQ(vector<Process> processes) {
                     current_process->set_state(4);
                     current_process->set_turnaroundTime(time + 1);
                     completed_list.push_back(*current_process);
-                    cout << "***Process " << current_process->get_id() << " completed at time " << time + 1 << "***" << endl;
+                    out << "***Process " << current_process->get_id() << " completed at time " << time + 1 << "***" << endl;
                 }
 
                 current_process->reset_level_counter();
@@ -458,47 +469,193 @@ vector<Process> MLFQ(vector<Process> processes) {
         }
 
         // Print Ready List
-        cout << "Ready List: [";
+        out << "Ready List: [";
         for (auto it = ready_list.begin(); it != ready_list.end(); ++it) {
-            cout << "{Process " << it->get_id() << ", Upcoming CPU Burst: " << it->get_bursts()[it->get_burst_index()] << "}";
+            out << "{Process " << it->get_id() << ", Upcoming CPU Burst: " << it->get_bursts()[it->get_burst_index()] << "}";
             if (next(it) != ready_list.end()) {
-                cout << ", ";
+                out << ", ";
             }
         }
-        cout << "]" << endl;
+        out << "]" << endl;
 
         // Print I/O List
-        cout << "I/O List: [";
+        out << "I/O List: [";
         for (auto it = io_list.begin(); it != io_list.end(); ++it) {
-            cout << "{Process " << it->get_id() << ", I/O Burst remaining: " << it->get_bursts()[it->get_burst_index()] << "}";
+            out << "{Process " << it->get_id() << ", I/O Burst remaining: " << it->get_bursts()[it->get_burst_index()] << "}";
             if (next(it) != io_list.end()) {
-                cout << ", ";
+                out << ", ";
             }
         }
-        cout << "]" << endl;
+        out << "]" << endl;
 
         time++; // Increment time
     }
 
     calculate_wait_time(completed_list);
-    cout << endl << "Total run time: " << time << " units" << endl;
+    out << endl << "------------------------------------";
+    out << endl << "Total run time: " << time << " units" << endl;
     double cpuUtilPercent = (double)cpuUtil / time * 100;
-    cout << "CPU Utilization: " << cpuUtilPercent << "%" << endl << endl;
+    out << "CPU Utilization: " << cpuUtilPercent << "%" << endl << endl;
     return completed_list;
 
 }
 
-void print_results(vector<Process> processes) {
+
+// Functions for main driver
+vector<Process> load_processes() {
+    vector<Process> processes = {
+        Process(1, {5, 27, 3, 31, 5, 43, 4, 18, 6, 22, 4, 26, 3, 24, 4}),
+        Process(2, {4, 48, 5, 44, 7, 42, 12, 37, 9, 76, 4, 41, 9, 31, 7, 43, 8}),
+        Process(3, {8, 33, 12, 41, 18, 65, 14, 21, 4, 61, 15, 18, 14, 26, 5, 31, 6}),
+        Process(4, {3, 35, 4, 41, 5, 45, 3, 51, 4, 61, 5, 54, 6, 82, 5, 77, 3}),
+        Process(5, {16, 24, 17, 21, 5, 36, 16, 26, 7, 31, 13, 28, 11, 21, 6, 13, 3, 11, 4}),
+        Process(6, {11, 22, 4, 8, 5, 10, 6, 12, 7, 14, 9, 18, 12, 24, 15, 30, 8}),
+        Process(7, {14, 46, 17, 41, 11, 42, 15, 21, 4, 32, 7, 19, 16, 33, 10}),
+        Process(8, {4, 14, 5, 33, 6, 51, 14, 73, 16, 87, 6})
+    };
+    return processes;
+}
+
+void welcome() {
+    cout << "******************************************************************************************************" << endl << endl;
+    cout << "Welcome to my CPU Scheduling Simulator!" << endl << endl;
+    cout << "In this program, users will have the option to simulate three different scheduling algorithms " << endl;
+    cout << "(FCFS, SJF, and MLFQ) with a pre-loaded set of processes that include interger arrays " << endl;
+    cout << "of their bursts-- both CPU and IO. Users can display a dynamic execution of these processes, followed" << endl;
+    cout << "by individual process times, as well as their averages. Users can select whether to" << endl;
+    cout << "output these results to the console or an output file." << endl << endl;
+    cout << "******************************************************************************************************";
+}
+
+char mainMenu() {
+
+    char choice;
+
+    cout << endl << endl;
+    cout << "Please choose from the following menu choices:" << endl;
+    cout << "Select 'F' or 'f'... to run FCFS simulation" << endl;
+    cout << "Select 'S' or 's'... to run SJF simulation" << endl;
+    cout << "Select 'M' or 'm'... to run MLFQ simulation" << endl;
+    cout << "Select 'Q' or 'q'... to QUIT" << endl << endl;
+
+    choice = cin.get();
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    choice = toupper(choice);
+
+    return choice;
+
+}
+
+char output() {
+
+    char choice;
+
+    cout << endl;
+    cout << "Please choose from the following menu choices (there is no going back to main menu before selecting): " << endl;
+    cout << "Select 'A'... or 'a'... to output to console" << endl;
+    cout << "Select 'b'... or 'B'... to output to a text file" << endl;
+
+    choice = cin.get();
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    choice = toupper(choice);
+
+    return choice;
+}
+
+void makeSelection(char menu_choice, vector<Process> processes) {
+
+    ofstream outputF("fcfs.txt");
+    ofstream outputS("sjf.txt");
+    ofstream outputM("mlfq.txt");
+
+    switch (menu_choice) {
+
+    case 'F':
+        char fselect;
+        cout << endl << "You have selected the FCFS algorithm!" << endl;
+        do {
+            fselect = output();
+        } while (fselect != 'A' && fselect != 'B');
+
+        if (fselect == 'A') {
+            vector <Process> complete_fcfs = FCFS(processes, cout);
+            print_averages(complete_fcfs, cout);
+            print_results(complete_fcfs, cout);
+
+        }
+        else {
+            vector <Process> complete_fcfs = FCFS(processes, outputF);
+            print_averages(complete_fcfs, outputF);
+            print_results(complete_fcfs, outputF);
+            outputF.close();
+            cout << endl << "Simulation complete!Your output will be found in the same directory as this program in a file named 'fcfs.txt'" << endl;
+        }
+        break;
+
+    case 'S':
+        char sselect;
+        cout << endl << "You have selected the SJF algorithm!" << endl;
+        do {
+            sselect = output();
+        } while (sselect != 'A' && sselect != 'B');
+
+        if (sselect == 'A') {
+            vector <Process> complete_sjf = SJF(processes, cout);
+            print_averages(complete_sjf, cout);
+            print_results(complete_sjf, cout);
+
+        }
+        else {
+            vector <Process> complete_sjf = SJF(processes, outputS);
+            print_averages(complete_sjf, outputS);
+            print_results(complete_sjf, outputS);
+            outputS.close();
+            cout << endl << "Simulation complete! Your output will be found in the same directory as this program in a file named 'sjf.txt'" << endl;
+        }
+        break;
+
+    case 'M':
+        char mselect;
+        cout << endl << "You have selected the MLFQ algorithm!" << endl;
+        do {
+            mselect = output();
+        } while (mselect != 'A' && mselect != 'B');
+
+        if (mselect == 'A') {
+            vector <Process> complete_mlfq = MLFQ(processes, cout);
+            print_averages(complete_mlfq, cout);
+            print_results(complete_mlfq, cout);
+
+        }
+        else {
+            vector <Process> complete_mlfq = MLFQ(processes, outputM);
+            print_averages(complete_mlfq, outputM);
+            print_results(complete_mlfq, outputM);
+            outputM.close();
+            cout << endl << "Simulation complete! Your output will be found in the same directory as this program in a file named 'mlfq.txt'" << endl;
+        }
+        break;
+
+    default:
+        cout << endl << "Invalid menu choice!" << endl;
+
+    }
+}
+
+// Helper functions
+void print_results(vector<Process> processes, ostream& out) {
 
     sort_process_by_id(processes);
 
     for (int i = 0; i < processes.size(); i++) {
-        cout << "Process " << processes[i].get_id() << ": " << endl;
-        cout << "  - Turnaround Time: " << processes[i].get_turnaroundTime() << endl;
-        cout << "  - Wait Time: " << processes[i].get_waitTime() << endl;
-        cout << "  - Response Time: " << processes[i].get_responseTime() << endl;
-        cout << endl;
+        out << "Process " << processes[i].get_id() << ": " << endl;
+        out << "  - Turnaround Time: " << processes[i].get_turnaroundTime() << endl;
+        out << "  - Wait Time: " << processes[i].get_waitTime() << endl;
+        out << "  - Response Time: " << processes[i].get_responseTime() << endl;
+        out << endl;
     }
+
+    out << endl << "Simulation complete!" << endl;
 
 }
 
@@ -515,7 +672,7 @@ void sort_process_by_id(vector<Process>& processes) {
         });
 }
 
-void print_averages(vector<Process> processes) {
+void print_averages(vector<Process> processes, ostream& out) {
 
     double total_turnaround_time = 0;
     double total_wait_time = 0;
@@ -531,9 +688,10 @@ void print_averages(vector<Process> processes) {
     double average_wait_time = total_wait_time / processes.size();
     double average_response_time = total_response_time / processes.size();
 
-    cout << "Average Turnaround Time: " << average_turnaround_time << endl;
-    cout << "Average Wait Time: " << average_wait_time << endl;
-    cout << "Average Response Time: " << average_response_time << endl;
+    out << "Average Turnaround Time: " << average_turnaround_time << endl;
+    out << "Average Wait Time: " << average_wait_time << endl;
+    out << "Average Response Time: " << average_response_time << endl;
+    out << "------------------------------------" << endl << endl;
 
 }
 
@@ -671,4 +829,34 @@ void Process::increment_level_counter() {
 
 void Process::reset_level_counter() {
     level_counter = 0;
+}
+
+// ASCII -- why not?!
+void goodbye() {
+
+    cout << endl << "Thanks for participating! Have a great day!" << endl << endl;
+
+    cout << "                                                                      ddddddd       bbbbbbb                                                          " << endl;
+    cout << "         GGGGGGGGGGGGG                                                d:::::d       b:::::b                                                    !!!   " << endl;
+    cout << "       GGG::::::::::::G                                               d:::::d       b:::::b                                                   !!::!  " << endl;
+    cout << "      GG:::::::::::::::G                                              d:::::d       b:::::b                                                   !:::!  " << endl;
+    cout << "     G:::::GGGGGGGG::::G                                              d:::::d       b:::::b                                                   !:::!  " << endl;
+    cout << "    G:::::G       GGGGGG   ooooooooooo     ooooooooooo        ddddddddd:::::d       b:::::bbbbbbbbb yyyyyyy           yyyyyyy eeeeeeeeeeee    !:::!  " << endl;
+    cout << "   G:::::G               oo:::::::::::o ooo:::::::::::oo    dd::::::::::::::d       b::::::::::::::bby:::::y         y:::::yee::::::::::::ee  !:::!  " << endl;
+    cout << "   G:::::G              o:::::::::::::::oo:::::::::::::::o d::::::::::::::::d       b::::::::::::::::by:::::y       y:::::ye::::::eeeee:::::ee!:::!  " << endl;
+    cout << "   G:::::G    GGGGGGGGGGo:::::ooooo:::::oo:::::ooooo:::::od:::::::ddddd:::::d       b:::::bbbbb:::::::by:::::y     y:::::ye::::::e     e:::::e!:::!  " << endl;
+    cout << "   G:::::G    G::::::::Go::::o     o::::oo::::o     o::::od::::::d    d:::::d       b:::::b    b::::::b y:::::y   y:::::y e:::::::eeeee::::::e!:::!  " << endl;
+    cout << "   G:::::G    GGGGG::::Go::::o     o::::oo::::o     o::::od:::::d     d:::::d       b:::::b     b:::::b  y:::::y y:::::y  e:::::::::::::::::e !:::!  " << endl;
+    cout << "   G:::::G        G::::Go::::o     o::::oo::::o     o::::od:::::d     d:::::d       b:::::b     b:::::b   y:::::y:::::y   e::::::eeeeeeeeeee  !!:!!  " << endl;
+    cout << "    G:::::G       G::::Go::::o     o::::oo::::o     o::::od:::::d     d:::::d       b:::::b     b:::::b    y:::::::::y    e:::::::e            !!!   " << endl;
+    cout << "     G:::::GGGGGGGG::::Go:::::ooooo:::::oo:::::ooooo:::::od::::::ddddd::::::d       b:::::bbbbbb::::::b     y:::::::y     e::::::::e                 " << endl;
+    cout << "      GG:::::::::::::::Go:::::::::::::::oo:::::::::::::::od:::::::::::::::::d       b::::::::::::::::b       y:::::y       e::::::::eeeeeeee   !!!   " << endl;
+    cout << "        GGG::::::GGG:::G oo:::::::::::oo  oo:::::::::::oo  d:::::::::ddd::::d       b:::::::::::::::b       y:::::y         ee:::::::::::::e  !!:!!  " << endl;
+    cout << "           GGGGGG   GGGG   ooooooooooo      ooooooooooo      ddddddddd  ddddd       bbbbbbbbbbbbbbbb       y:::::y            eeeeeeeeeeeeee   !!!   " << endl;
+    cout << "                                                                                                          y:::::y                                    " << endl;
+    cout << "                                                                                                         y:::::y                                     " << endl;
+    cout << "                                                                                                        y:::::y                                      " << endl;
+    cout << "                                                                                                       y:::::y                                       " << endl;
+    cout << "                                                                                                      yyyyyyy                                        " << endl;
+
 }
